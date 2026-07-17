@@ -1,5 +1,5 @@
 package com.resumeanalyzer.backend.service;
-
+import com.resumeanalyzer.backend.entity.ParsedResumeData;
 import com.resumeanalyzer.backend.dto.ResumeResponse;
 import com.resumeanalyzer.backend.entity.Resume;
 import com.resumeanalyzer.backend.entity.User;
@@ -24,6 +24,7 @@ public class ResumeService {
 
     private final ResumeRepository resumeRepository;
     private final UserRepository userRepository;
+    private final ResumeParserService resumeParserService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -62,7 +63,6 @@ public class ResumeService {
             Path filePath = uploadPath.resolve(storedFileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // Deactivate previous active resume
             resumeRepository.findByUserAndActiveTrue(user)
                     .ifPresent(prev -> {
                         prev.setActive(false);
@@ -81,12 +81,20 @@ public class ResumeService {
 
             resumeRepository.save(resume);
 
+            try {
+                resumeParserService.parseAndSave(resume);
+            } catch (Exception e) {
+                System.err.println("Resume parsing failed: " + e.getMessage());
+            }
+
             return mapToResponse(resume);
 
         } catch (IOException e) {
             throw new ApiException("Failed to store file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+
 
     public List<ResumeResponse> getUserResumes(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
