@@ -10,4 +10,10 @@ public class HealthController {
     public String healthCheck() {
         return "Backend is running successfully!";
     }
+
+
+    @GetMapping("/api/protected/test")
+    public String protectedTest() {
+        return "You are authenticated! JWT is working correctly.";
+    }
 }
