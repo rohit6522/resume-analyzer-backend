@@ -1,0 +1,6 @@
+target/
+.idea/
+.mvn/
+uploads/
+profile-photos/
+*.iml
