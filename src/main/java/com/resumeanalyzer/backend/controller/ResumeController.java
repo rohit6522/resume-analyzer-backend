@@ -21,6 +21,10 @@ import com.resumeanalyzer.backend.entity.JobMatch;
 import com.resumeanalyzer.backend.service.JobMatchService;
 import jakarta.validation.Valid;
 
+import com.resumeanalyzer.backend.service.ReportService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,6 +37,8 @@ public class ResumeController {
     private final ResumeParserService resumeParserService;
     private final AtsService atsService;
     private final JobMatchService jobMatchService;
+    private final ReportService reportService;
+
     @PostMapping("/upload")
     public ResponseEntity<ResumeResponse> upload(
             @RequestParam("file") MultipartFile file,
@@ -129,5 +135,16 @@ public class ResumeController {
                 .recommendations(match.getRecommendations())
                 .createdAt(match.getCreatedAt())
                 .build();
+    }
+
+    @GetMapping("/{id}/report")
+    public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {
+        Resume resume = resumeService.getResumeEntityById(id);
+        byte[] pdfBytes = reportService.generateReport(resume);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resume-report.pdf")
+                .body(pdfBytes);
     }
 }
