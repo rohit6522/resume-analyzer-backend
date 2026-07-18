@@ -65,9 +65,18 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/auth/**").permitAll()                )
-                .authenticationProvider(authenticationProvider())
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/health", "/api/auth/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+
+
+                .authenticationProvider(authenticationProvider()
+                )
+
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
