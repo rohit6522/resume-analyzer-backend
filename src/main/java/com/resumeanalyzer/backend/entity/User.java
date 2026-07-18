@@ -30,7 +30,9 @@ public class User {
     private String password;
 
     private String phone;
-
+    private String bio;
+    private String photoUrl;
+    
     @Builder.Default
     private boolean enabled = true;
 

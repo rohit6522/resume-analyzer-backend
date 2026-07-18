@@ -33,5 +33,6 @@ build/
 .vscode/
 
 uploads/
+profile-photos/
 
 application-secrets.properties
