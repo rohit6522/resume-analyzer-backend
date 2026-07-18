@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.resumeanalyzer.backend.service.ResumeParserService;
 import java.util.List;
+import com.resumeanalyzer.backend.dto.AtsScoreResponse;
+import com.resumeanalyzer.backend.entity.AtsScore;
+import com.resumeanalyzer.backend.service.AtsService;
+import com.resumeanalyzer.backend.entity.Resume;
 
 @RestController
 @RequestMapping("/api/resumes")
@@ -18,6 +22,7 @@ public class ResumeController {
 
     private final ResumeService resumeService;
     private final ResumeParserService resumeParserService;
+    private final AtsService atsService;
     @PostMapping("/upload")
     public ResponseEntity<ResumeResponse> upload(
             @RequestParam("file") MultipartFile file,
@@ -54,5 +59,34 @@ public class ResumeController {
                 .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/generate-ats-score")
+    public ResponseEntity<AtsScoreResponse> generateAtsScore(@PathVariable Long id) {
+        Resume resume = resumeService.getResumeEntityById(id); // we'll add this helper next
+        AtsScore score = atsService.generateAtsScore(resume);
+        return ResponseEntity.ok(mapAtsToResponse(score));
+    }
+
+    @GetMapping("/{id}/ats-score")
+    public ResponseEntity<AtsScoreResponse> getAtsScore(@PathVariable Long id) {
+        AtsScore score = atsService.getAtsScoreByResumeId(id);
+        return ResponseEntity.ok(mapAtsToResponse(score));
+    }
+
+    private AtsScoreResponse mapAtsToResponse(AtsScore score) {
+        return AtsScoreResponse.builder()
+                .overallScore(score.getOverallScore())
+                .formattingScore(score.getFormattingScore())
+                .keywordScore(score.getKeywordScore())
+                .grammarScore(score.getGrammarScore())
+                .projectsScore(score.getProjectsScore())
+                .experienceScore(score.getExperienceScore())
+                .educationScore(score.getEducationScore())
+                .skillsScore(score.getSkillsScore())
+                .strengths(score.getStrengths())
+                .weaknesses(score.getWeaknesses())
+                .suggestions(score.getSuggestions())
+                .build();
     }
 }

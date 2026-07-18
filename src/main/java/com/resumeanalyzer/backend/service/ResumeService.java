@@ -136,4 +136,9 @@ public class ResumeService {
                 .uploadedAt(resume.getUploadedAt())
                 .build();
     }
+
+    public Resume getResumeEntityById(Long id) {
+        return resumeRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Resume not found", HttpStatus.NOT_FOUND));
+    }
 }
