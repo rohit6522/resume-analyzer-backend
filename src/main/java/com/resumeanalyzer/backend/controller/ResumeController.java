@@ -15,6 +15,15 @@ import com.resumeanalyzer.backend.entity.AtsScore;
 import com.resumeanalyzer.backend.service.AtsService;
 import com.resumeanalyzer.backend.entity.Resume;
 
+import com.resumeanalyzer.backend.dto.JobMatchRequest;
+import com.resumeanalyzer.backend.dto.JobMatchResponse;
+import com.resumeanalyzer.backend.entity.JobMatch;
+import com.resumeanalyzer.backend.service.JobMatchService;
+import jakarta.validation.Valid;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
 @RestController
 @RequestMapping("/api/resumes")
 @RequiredArgsConstructor
@@ -23,6 +32,7 @@ public class ResumeController {
     private final ResumeService resumeService;
     private final ResumeParserService resumeParserService;
     private final AtsService atsService;
+    private final JobMatchService jobMatchService;
     @PostMapping("/upload")
     public ResponseEntity<ResumeResponse> upload(
             @RequestParam("file") MultipartFile file,
@@ -87,6 +97,37 @@ public class ResumeController {
                 .strengths(score.getStrengths())
                 .weaknesses(score.getWeaknesses())
                 .suggestions(score.getSuggestions())
+                .build();
+    }
+
+
+    @PostMapping("/{id}/match-job")
+    public ResponseEntity<JobMatchResponse> matchJob(
+            @PathVariable Long id,
+            @Valid @RequestBody JobMatchRequest request) {
+
+        Resume resume = resumeService.getResumeEntityById(id);
+        JobMatch match = jobMatchService.matchResumeToJob(resume, request.getJobDescription());
+        return ResponseEntity.ok(mapJobMatchToResponse(match));
+    }
+
+    @GetMapping("/{id}/job-matches")
+    public ResponseEntity<List<JobMatchResponse>> getJobMatches(@PathVariable Long id) {
+        List<JobMatchResponse> matches = jobMatchService.getMatchesForResume(id)
+                .stream()
+                .map(this::mapJobMatchToResponse)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(matches);
+    }
+
+    private JobMatchResponse mapJobMatchToResponse(JobMatch match) {
+        return JobMatchResponse.builder()
+                .id(match.getId())
+                .matchPercentage(match.getMatchPercentage())
+                .matchedSkills(match.getMatchedSkills())
+                .missingSkills(match.getMissingSkills())
+                .recommendations(match.getRecommendations())
+                .createdAt(match.getCreatedAt())
                 .build();
     }
 }
