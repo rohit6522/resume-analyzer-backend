@@ -1,9 +1,11 @@
 package com.resumeanalyzer.backend.service;
-import com.resumeanalyzer.backend.entity.ParsedResumeData;
+
 import com.resumeanalyzer.backend.dto.ResumeResponse;
 import com.resumeanalyzer.backend.entity.Resume;
 import com.resumeanalyzer.backend.entity.User;
 import com.resumeanalyzer.backend.exception.ApiException;
+import com.resumeanalyzer.backend.repository.AtsScoreRepository;
+import com.resumeanalyzer.backend.repository.ParsedResumeDataRepository;
 import com.resumeanalyzer.backend.repository.ResumeRepository;
 import com.resumeanalyzer.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,8 @@ public class ResumeService {
     private final ResumeRepository resumeRepository;
     private final UserRepository userRepository;
     private final ResumeParserService resumeParserService;
+    private final ParsedResumeDataRepository parsedResumeDataRepository;
+    private final AtsScoreRepository atsScoreRepository;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -94,8 +98,6 @@ public class ResumeService {
         }
     }
 
-
-
     public List<ResumeResponse> getUserResumes(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
@@ -116,6 +118,10 @@ public class ResumeService {
         if (!resume.getUser().getId().equals(user.getId())) {
             throw new ApiException("You are not authorized to delete this resume", HttpStatus.FORBIDDEN);
         }
+
+        // Delete dependent records first (foreign key constraints)
+        atsScoreRepository.findByResumeId(resumeId).ifPresent(atsScoreRepository::delete);
+        parsedResumeDataRepository.findByResumeId(resumeId).ifPresent(parsedResumeDataRepository::delete);
 
         try {
             Files.deleteIfExists(Paths.get(resume.getFilePath()));
