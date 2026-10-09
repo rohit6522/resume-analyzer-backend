@@ -27,12 +27,15 @@ public class AtsService {
                 .orElseThrow(() -> new ApiException("Resume must be parsed before scoring", HttpStatus.BAD_REQUEST));
 
         String prompt = buildPrompt(parsedData.getRawText());
-
         String aiResponse = geminiService.generateContent(prompt);
-
         String cleanJson = cleanJsonResponse(aiResponse);
-
         AtsScore atsScore = parseAtsResponse(cleanJson, resume);
+
+        // Replace the old score only after the AI call succeeded (resume_id is unique)
+        atsScoreRepository.findByResumeId(resume.getId()).ifPresent(existing -> {
+            atsScoreRepository.delete(existing);
+            atsScoreRepository.flush();
+        });
 
         return atsScoreRepository.save(atsScore);
     }

@@ -147,4 +147,18 @@ public class ResumeService {
         return resumeRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Resume not found", HttpStatus.NOT_FOUND));
     }
+
+    public Resume getOwnedResume(String userEmail, Long resumeId) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
+
+        Resume resume = resumeRepository.findById(resumeId)
+                .orElseThrow(() -> new ApiException("Resume not found", HttpStatus.NOT_FOUND));
+
+        // Return 404 (not 403) so we don't reveal that someone else's resume exists
+        if (!resume.getUser().getId().equals(user.getId())) {
+            throw new ApiException("Resume not found", HttpStatus.NOT_FOUND);
+        }
+        return resume;
+    }
 }
