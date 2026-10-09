@@ -40,8 +40,12 @@ public class AtsScore {
     @Column(columnDefinition = "TEXT")
     private String suggestions;
 
+    @Column(columnDefinition = "TEXT")
+    private String dateConsistencyNotes;
+
     @Column(updatable = false)
     private LocalDateTime generatedAt;
+
 
     @PrePersist
     protected void onCreate() {

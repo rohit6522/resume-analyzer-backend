@@ -19,4 +19,5 @@ public class AtsScoreResponse {
     private String strengths;
     private String weaknesses;
     private String suggestions;
+    private String dateConsistencyNotes;
 }

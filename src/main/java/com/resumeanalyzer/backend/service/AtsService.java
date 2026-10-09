@@ -38,28 +38,34 @@ public class AtsService {
     }
 
     private String buildPrompt(String resumeText) {
+        String currentDate = java.time.LocalDate.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+
         return """
-                You are an expert ATS (Applicant Tracking System) resume evaluator.
-                Analyze the following resume text and return ONLY a valid JSON object
-                (no markdown, no explanation, no code fences) with exactly this structure:
+            You are an expert ATS (Applicant Tracking System) resume evaluator.
+            Today's date is %s. Use this as the reference point for all date-related checks.
 
-                {
-                  "overallScore": <0-100 integer>,
-                  "formattingScore": <0-100 integer>,
-                  "keywordScore": <0-100 integer>,
-                  "grammarScore": <0-100 integer>,
-                  "projectsScore": <0-100 integer>,
-                  "experienceScore": <0-100 integer>,
-                  "educationScore": <0-100 integer>,
-                  "skillsScore": <0-100 integer>,
-                  "strengths": "<3-4 short bullet points separated by newline>",
-                  "weaknesses": "<3-4 short bullet points separated by newline>",
-                  "suggestions": "<3-4 actionable improvement suggestions separated by newline>"
-                }
+            Analyze the following resume text and return ONLY a valid JSON object
+            (no markdown, no explanation, no code fences) with exactly this structure:
 
-                Resume text:
-                %s
-                """.formatted(resumeText);
+            {
+              "overallScore": <0-100 integer>,
+              "formattingScore": <0-100 integer>,
+              "keywordScore": <0-100 integer>,
+              "grammarScore": <0-100 integer>,
+              "projectsScore": <0-100 integer>,
+              "experienceScore": <0-100 integer>,
+              "educationScore": <0-100 integer>,
+              "skillsScore": <0-100 integer>,
+              "strengths": "<3-4 short bullet points separated by newline>",
+              "weaknesses": "<3-4 short bullet points separated by newline>",
+              "suggestions": "<3-4 actionable improvement suggestions separated by newline>",
+              "dateConsistencyNotes": "<Check all dates in the resume against today's date. Flag any future-dated education/experience entries, incorrect total experience calculations, outdated-looking content (e.g. no activity in the last 2+ years), or inconsistent date ranges. If everything looks consistent and current, say so in one short line. Separate multiple notes by newline.>"
+            }
+
+            Resume text:
+            %s
+            """.formatted(currentDate, resumeText);
     }
 
     private String cleanJsonResponse(String rawResponse) {
@@ -88,6 +94,7 @@ public class AtsService {
                     .strengths(node.path("strengths").asText())
                     .weaknesses(node.path("weaknesses").asText())
                     .suggestions(node.path("suggestions").asText())
+                    .dateConsistencyNotes(node.path("dateConsistencyNotes").asText())
                     .build();
 
         } catch (Exception e) {

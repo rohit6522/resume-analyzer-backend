@@ -103,6 +103,7 @@ public class ResumeController {
                 .strengths(score.getStrengths())
                 .weaknesses(score.getWeaknesses())
                 .suggestions(score.getSuggestions())
+                .dateConsistencyNotes(score.getDateConsistencyNotes())
                 .build();
     }
 
