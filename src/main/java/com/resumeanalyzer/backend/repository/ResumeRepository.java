@@ -14,4 +14,6 @@ public interface ResumeRepository extends JpaRepository<Resume, Long> {
     Optional<Resume> findByUserAndActiveTrue(User user);
 
     List<Resume> findByUserIdOrderByUploadedAtDesc(Long userId);
+
+    long countByUser(User user);
 }

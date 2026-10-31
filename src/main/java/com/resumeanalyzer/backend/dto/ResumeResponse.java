@@ -15,5 +15,7 @@ public class ResumeResponse {
     private String fileType;
     private Long fileSize;
     private boolean active;
+    private String versionLabel;
+    private String targetRole;
     private LocalDateTime uploadedAt;
 }

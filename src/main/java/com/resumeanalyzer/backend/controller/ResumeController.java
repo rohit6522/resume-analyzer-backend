@@ -1,12 +1,9 @@
 package com.resumeanalyzer.backend.controller;
 
-import com.resumeanalyzer.backend.dto.AtsScoreResponse;
-import com.resumeanalyzer.backend.dto.JobMatchRequest;
-import com.resumeanalyzer.backend.dto.JobMatchResponse;
-import com.resumeanalyzer.backend.dto.ParsedResumeResponse;
-import com.resumeanalyzer.backend.dto.ResumeResponse;
+import com.resumeanalyzer.backend.dto.*;
 import com.resumeanalyzer.backend.entity.AtsScore;
 import com.resumeanalyzer.backend.entity.JobMatch;
+import com.resumeanalyzer.backend.entity.ParsedResumeData;
 import com.resumeanalyzer.backend.entity.Resume;
 import com.resumeanalyzer.backend.service.AtsService;
 import com.resumeanalyzer.backend.service.JobMatchService;
@@ -40,15 +37,33 @@ public class ResumeController {
     @PostMapping("/upload")
     public ResponseEntity<ResumeResponse> upload(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "versionLabel", required = false) String versionLabel,
+            @RequestParam(value = "targetRole", required = false) String targetRole,
             Authentication authentication) {
 
-        ResumeResponse response = resumeService.uploadResume(authentication.getName(), file);
+        ResumeResponse response = resumeService.uploadResume(authentication.getName(), file, versionLabel, targetRole);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
     public ResponseEntity<List<ResumeResponse>> getMyResumes(Authentication authentication) {
         return ResponseEntity.ok(resumeService.getUserResumes(authentication.getName()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ResumeResponse> getResumeById(
+            @PathVariable Long id, Authentication authentication) {
+        Resume resume = resumeService.getOwnedResume(authentication.getName(), id);
+        return ResponseEntity.ok(resumeService.mapToResponse(resume));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ResumeResponse> updateResumeMeta(
+            @PathVariable Long id,
+            @RequestParam(value = "versionLabel", required = false) String versionLabel,
+            @RequestParam(value = "targetRole", required = false) String targetRole,
+            Authentication authentication) {
+        return ResponseEntity.ok(resumeService.updateResumeMeta(authentication.getName(), id, versionLabel, targetRole));
     }
 
     @DeleteMapping("/{id}")
@@ -62,17 +77,19 @@ public class ResumeController {
             @PathVariable Long id, Authentication authentication) {
 
         resumeService.getOwnedResume(authentication.getName(), id);
-        var parsedData = resumeParserService.getParsedDataByResumeId(id);
+        ParsedResumeData data = resumeParserService.getParsedDataByResumeId(id);
+        return ResponseEntity.ok(mapParsedDataToResponse(data));
+    }
 
-        ParsedResumeResponse response = ParsedResumeResponse.builder()
-                .fullName(parsedData.getFullName())
-                .email(parsedData.getEmail())
-                .phone(parsedData.getPhone())
-                .linkedin(parsedData.getLinkedin())
-                .github(parsedData.getGithub())
-                .build();
+    @PutMapping("/{id}/parsed-data")
+    public ResponseEntity<ParsedResumeResponse> updateParsedData(
+            @PathVariable Long id,
+            @RequestBody UpdateParsedResumeRequest request,
+            Authentication authentication) {
 
-        return ResponseEntity.ok(response);
+        resumeService.getOwnedResume(authentication.getName(), id);
+        ParsedResumeData updated = resumeParserService.updateParsedData(id, request);
+        return ResponseEntity.ok(mapParsedDataToResponse(updated));
     }
 
     @PostMapping("/{id}/generate-ats-score")
@@ -100,8 +117,21 @@ public class ResumeController {
             Authentication authentication) {
 
         Resume resume = resumeService.getOwnedResume(authentication.getName(), id);
-        JobMatch match = jobMatchService.matchResumeToJob(resume, request.getJobDescription());
-        return ResponseEntity.ok(mapJobMatchToResponse(match));
+        JobMatch match = jobMatchService.matchResumeToJob(resume, request.getJobDescription(), request.getJobTitle(), request.getCompanyName());
+        return ResponseEntity.ok(jobMatchService.mapJobMatchToResponse(match));
+    }
+
+    @PostMapping(value = "/{id}/match-job-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<JobMatchResponse> matchJobFile(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "jobTitle", required = false) String jobTitle,
+            @RequestParam(value = "companyName", required = false) String companyName,
+            Authentication authentication) {
+
+        Resume resume = resumeService.getOwnedResume(authentication.getName(), id);
+        JobMatch match = jobMatchService.matchResumeToJobFile(resume, file, jobTitle, companyName);
+        return ResponseEntity.ok(jobMatchService.mapJobMatchToResponse(match));
     }
 
     @GetMapping("/{id}/job-matches")
@@ -111,7 +141,7 @@ public class ResumeController {
         resumeService.getOwnedResume(authentication.getName(), id);
         List<JobMatchResponse> matches = jobMatchService.getMatchesForResume(id)
                 .stream()
-                .map(this::mapJobMatchToResponse)
+                .map(jobMatchService::mapJobMatchToResponse)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(matches);
     }
@@ -129,31 +159,53 @@ public class ResumeController {
                 .body(pdfBytes);
     }
 
-    private AtsScoreResponse mapAtsToResponse(AtsScore score) {
-        return AtsScoreResponse.builder()
-                .overallScore(score.getOverallScore())
-                .formattingScore(score.getFormattingScore())
-                .keywordScore(score.getKeywordScore())
-                .grammarScore(score.getGrammarScore())
-                .projectsScore(score.getProjectsScore())
-                .experienceScore(score.getExperienceScore())
-                .educationScore(score.getEducationScore())
-                .skillsScore(score.getSkillsScore())
-                .strengths(score.getStrengths())
-                .weaknesses(score.getWeaknesses())
-                .suggestions(score.getSuggestions())
-                .dateConsistencyNotes(score.getDateConsistencyNotes())
+    private ParsedResumeResponse mapParsedDataToResponse(ParsedResumeData data) {
+        return ParsedResumeResponse.builder()
+                .id(data.getId())
+                .resumeId(data.getResume().getId())
+                .fullName(data.getFullName())
+                .email(data.getEmail())
+                .phone(data.getPhone())
+                .linkedin(data.getLinkedin())
+                .github(data.getGithub())
+                .portfolio(data.getPortfolio())
+                .summary(data.getSummary())
+                .skills(data.getSkills())
+                .technicalSkills(data.getTechnicalSkills())
+                .softSkills(data.getSoftSkills())
+                .workExperience(data.getWorkExperience())
+                .education(data.getEducation())
+                .projects(data.getProjects())
+                .certifications(data.getCertifications())
+                .achievements(data.getAchievements())
+                .rawText(data.getRawText())
                 .build();
     }
 
-    private JobMatchResponse mapJobMatchToResponse(JobMatch match) {
-        return JobMatchResponse.builder()
-                .id(match.getId())
-                .matchPercentage(match.getMatchPercentage())
-                .matchedSkills(match.getMatchedSkills())
-                .missingSkills(match.getMissingSkills())
-                .recommendations(match.getRecommendations())
-                .createdAt(match.getCreatedAt())
+    private AtsScoreResponse mapAtsToResponse(AtsScore score) {
+        return AtsScoreResponse.builder()
+                .overallScore(score.getOverallScore())
+                .skillsScore(score.getSkillsScore())
+                .experienceScore(score.getExperienceScore())
+                .projectsScore(score.getProjectsScore())
+                .educationScore(score.getEducationScore())
+                .formattingScore(score.getFormattingScore())
+                .contentQualityScore(score.getContentQualityScore())
+                .atsCompatibilityScore(score.getAtsCompatibilityScore())
+                .keywordScore(score.getKeywordScore())
+                .grammarScore(score.getGrammarScore())
+                .actionVerbsScore(score.getActionVerbsScore())
+                .quantifiableMetricsScore(score.getQuantifiableMetricsScore())
+                .strengths(score.getStrengths())
+                .weaknesses(score.getWeaknesses())
+                .suggestions(score.getSuggestions())
+                .actionVerbsFound(score.getActionVerbsFound())
+                .actionVerbsMissing(score.getActionVerbsMissing())
+                .quantifiableMetricsNotes(score.getQuantifiableMetricsNotes())
+                .missingSections(score.getMissingSections())
+                .dateConsistencyNotes(score.getDateConsistencyNotes())
+                .evaluationDisclaimer(score.getEvaluationDisclaimer())
+                .sectionBreakdownJson(score.getSectionBreakdownJson())
                 .build();
     }
 }

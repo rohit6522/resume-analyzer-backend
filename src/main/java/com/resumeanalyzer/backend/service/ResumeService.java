@@ -9,6 +9,7 @@ import com.resumeanalyzer.backend.repository.ParsedResumeDataRepository;
 import com.resumeanalyzer.backend.repository.ResumeRepository;
 import com.resumeanalyzer.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ResumeService {
@@ -39,13 +41,22 @@ public class ResumeService {
     );
 
     public ResumeResponse uploadResume(String userEmail, MultipartFile file) {
+        return uploadResume(userEmail, file, null, null);
+    }
 
-        if (file.isEmpty()) {
-            throw new ApiException("File is empty", HttpStatus.BAD_REQUEST);
+    public ResumeResponse uploadResume(String userEmail, MultipartFile file, String versionLabel, String targetRole) {
+        if (file == null || file.isEmpty()) {
+            throw new ApiException("File is empty or not provided", HttpStatus.BAD_REQUEST);
         }
 
         String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_TYPES.contains(contentType)) {
+        String originalFileName = file.getOriginalFilename();
+        boolean isPdf = (contentType != null && contentType.contains("pdf")) ||
+                        (originalFileName != null && originalFileName.toLowerCase().endsWith(".pdf"));
+        boolean isDocx = (contentType != null && contentType.contains("wordprocessingml")) ||
+                         (originalFileName != null && originalFileName.toLowerCase().endsWith(".docx"));
+
+        if (!isPdf && !isDocx) {
             throw new ApiException("Only PDF and DOCX files are allowed", HttpStatus.BAD_REQUEST);
         }
 
@@ -58,28 +69,34 @@ public class ResumeService {
                 Files.createDirectories(uploadPath);
             }
 
-            String originalFileName = file.getOriginalFilename();
             String extension = originalFileName != null && originalFileName.contains(".")
                     ? originalFileName.substring(originalFileName.lastIndexOf("."))
-                    : "";
+                    : (isPdf ? ".pdf" : ".docx");
             String storedFileName = UUID.randomUUID() + extension;
 
             Path filePath = uploadPath.resolve(storedFileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
+            // Deactivate previous active resumes
             resumeRepository.findByUserAndActiveTrue(user)
                     .ifPresent(prev -> {
                         prev.setActive(false);
                         resumeRepository.save(prev);
                     });
 
+            String finalVersionLabel = (versionLabel != null && !versionLabel.isBlank())
+                    ? versionLabel.trim()
+                    : "Resume Version " + (resumeRepository.countByUser(user) + 1);
+
             Resume resume = Resume.builder()
                     .user(user)
-                    .originalFileName(originalFileName)
+                    .originalFileName(originalFileName != null ? originalFileName : "resume" + extension)
                     .storedFileName(storedFileName)
                     .filePath(filePath.toString())
-                    .fileType(contentType.contains("pdf") ? "PDF" : "DOCX")
+                    .fileType(isPdf ? "PDF" : "DOCX")
                     .fileSize(file.getSize())
+                    .versionLabel(finalVersionLabel)
+                    .targetRole(targetRole != null && !targetRole.isBlank() ? targetRole.trim() : "General")
                     .active(true)
                     .build();
 
@@ -88,7 +105,7 @@ public class ResumeService {
             try {
                 resumeParserService.parseAndSave(resume);
             } catch (Exception e) {
-                System.err.println("Resume parsing failed: " + e.getMessage());
+                log.error("Resume parsing failed for resume ID {}: {}", resume.getId(), e.getMessage());
             }
 
             return mapToResponse(resume);
@@ -96,6 +113,17 @@ public class ResumeService {
         } catch (IOException e) {
             throw new ApiException("Failed to store file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public ResumeResponse updateResumeMeta(String userEmail, Long resumeId, String versionLabel, String targetRole) {
+        Resume resume = getOwnedResume(userEmail, resumeId);
+        if (versionLabel != null && !versionLabel.isBlank()) {
+            resume.setVersionLabel(versionLabel.trim());
+        }
+        if (targetRole != null && !targetRole.isBlank()) {
+            resume.setTargetRole(targetRole.trim());
+        }
+        return mapToResponse(resumeRepository.save(resume));
     }
 
     public List<ResumeResponse> getUserResumes(String userEmail) {
@@ -126,19 +154,21 @@ public class ResumeService {
         try {
             Files.deleteIfExists(Paths.get(resume.getFilePath()));
         } catch (IOException e) {
-            throw new ApiException("Failed to delete file from storage", HttpStatus.INTERNAL_SERVER_ERROR);
+            log.warn("Failed to delete physical file from storage: {}", e.getMessage());
         }
 
         resumeRepository.delete(resume);
     }
 
-    private ResumeResponse mapToResponse(Resume resume) {
+    public ResumeResponse mapToResponse(Resume resume) {
         return ResumeResponse.builder()
                 .id(resume.getId())
                 .originalFileName(resume.getOriginalFileName())
                 .fileType(resume.getFileType())
                 .fileSize(resume.getFileSize())
                 .active(resume.isActive())
+                .versionLabel(resume.getVersionLabel())
+                .targetRole(resume.getTargetRole())
                 .uploadedAt(resume.getUploadedAt())
                 .build();
     }

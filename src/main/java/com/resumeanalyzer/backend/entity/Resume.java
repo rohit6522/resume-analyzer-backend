@@ -39,6 +39,12 @@ public class Resume {
     @Builder.Default
     private boolean active = true; // for soft delete / "current resume"
 
+    @Column(name = "version_label")
+    private String versionLabel;
+
+    @Column(name = "target_role")
+    private String targetRole;
+
     @Column(updatable = false)
     private LocalDateTime uploadedAt;
 

@@ -7,8 +7,13 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class JobMatchRequest {
 
     @NotBlank(message = "Job description is required")
     private String jobDescription;
+
+    private String jobTitle;
+
+    private String companyName;
 }

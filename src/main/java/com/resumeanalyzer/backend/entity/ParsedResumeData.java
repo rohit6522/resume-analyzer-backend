@@ -30,10 +30,37 @@ public class ParsedResumeData {
     private String portfolio;
 
     @Column(columnDefinition = "TEXT")
-    private String skills; // comma-separated for now
+    private String summary;
 
     @Column(columnDefinition = "TEXT")
-    private String rawText; // full extracted text, useful for AI later
+    private String skills; // combined skills
+
+    @Column(columnDefinition = "TEXT")
+    private String technicalSkills;
+
+    @Column(columnDefinition = "TEXT")
+    private String softSkills;
+
+    @Column(columnDefinition = "TEXT")
+    private String workExperience;
+
+    @Column(columnDefinition = "TEXT")
+    private String education;
+
+    @Column(columnDefinition = "TEXT")
+    private String projects;
+
+    @Column(columnDefinition = "TEXT")
+    private String certifications;
+
+    @Column(columnDefinition = "TEXT")
+    private String achievements;
+
+    @Column(columnDefinition = "TEXT")
+    private String structuredDataJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String rawText; // full extracted text
 
     @Column(updatable = false)
     private LocalDateTime parsedAt;
